@@ -1,0 +1,8 @@
+let
+    원본 = Table.NestedJoin(temp_2depth, {"Model Category_2depth"}, #"temp_1, 2depth", {"Model Category_2depth"}, "temp_1, 2depth", JoinKind.LeftOuter),
+    #"확장된 temp_1, 2depth" = Table.ExpandTableColumn(원본, "temp_1, 2depth", {"Model Category_1depth"}, {"temp_1, 2depth.Model Category_1depth"}),
+    #"다시 정렬한 열 수" = Table.ReorderColumns(#"확장된 temp_1, 2depth",{"WeekNumber", "temp_1, 2depth.Model Category_1depth", "Model Category_2depth", "Visits"}),
+    #"이름을 바꾼 열 수" = Table.RenameColumns(#"다시 정렬한 열 수",{{"temp_1, 2depth.Model Category_1depth", "Model Category_1depth"}}),
+    #"변경된 유형" = Table.TransformColumnTypes(#"이름을 바꾼 열 수",{{"Visits", Int64.Type}})
+in
+    #"변경된 유형"

@@ -1,0 +1,39 @@
+let
+
+
+    // 현재 파일 경로를 가져오는 부분
+    SourceFolder = Excel.CurrentWorkbook(){[Name="Path"]}[Content]{0}[Column1],
+   
+    // 상대 경로를 통해 CSV 파일 경로 설정
+    SourceFile = SourceFolder & "\adobe_raw\New_Weekly_전체_기획전_Ken -P4 WEB - Korea.csv",
+    
+    // CSV 파일 불러오기
+    원본 = Csv.Document(File.Contents(SourceFile), [Delimiter=",", Columns=9, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+
+
+//    원본 = Csv.Document(File.Contents("C:\Users\PTK\OneDrive - Cheil\바탕 화면\Weekly Report\new_report_ver2\adobe_raw\New_Weekly_전체_기획전_Ken -P4 WEB - Korea.csv"),[Delimiter=",", Columns=9, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+    #"형식 변경" = Table.TransformColumnTypes(원본,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Column6", type text}, {"Column7", type text}, {"Column8", type text}, {"Column9", type text}}),
+    #"이름을 바꾼 열 수" = Table.RenameColumns(#"형식 변경",{{"Column1", "Week"}, {"Column2", "UniqueVisitors"}, {"Column3", "Visits"}, {"Column4", "PageViews"}, {"Column5", "TimeSpentPerVisit"}, {"Column6", "OrderAfterVisit"}, {"Column7", "RevenueAfterVisit"}, {"Column8", "OrderAfterCTA"}, {"Column9", "RevenueAfterCTA"}}),
+    #"제거된 상위 행 수" = Table.Skip(#"이름을 바꾼 열 수",8),
+    #"조건 열이 추가됨" = Table.AddColumn(#"제거된 상위 행 수", "CampaignName", each if Text.StartsWith([Week], "#") then [Week] else null),
+    #"바꾼 값" = Table.ReplaceValue(#"조건 열이 추가됨","##############################################",null,Replacer.ReplaceValue,{"CampaignName"}),
+    #"바꾼 값1" = Table.ReplaceValue(#"바꾼 값","# ","",Replacer.ReplaceText,{"CampaignName"}),
+    #"아래로 채우기" = Table.FillDown(#"바꾼 값1",{"CampaignName"}),
+    #"다시 정렬한 열 수" = Table.ReorderColumns(#"아래로 채우기",{"CampaignName", "Week", "UniqueVisitors", "Visits", "PageViews", "TimeSpentPerVisit", "OrderAfterVisit", "RevenueAfterVisit", "OrderAfterCTA", "RevenueAfterCTA"}),
+    #"필터링된 행" = Table.SelectRows(#"다시 정렬한 열 수", each ([Week] <> "" and [Week] <> "##############################################" and [Week] <> "Week")),
+    #"필터링된 행1" = Table.SelectRows(#"필터링된 행", each not Text.StartsWith([Week], "#")),
+    #"변경된 유형" = Table.TransformColumnTypes(#"필터링된 행1",{{"Week", type datetime}}),
+    #"변경된 유형1" = Table.TransformColumnTypes(#"변경된 유형",{{"Week", type date}, {"UniqueVisitors", Int64.Type}, {"Visits", Int64.Type}, {"PageViews", Int64.Type}, {"TimeSpentPerVisit", type number}, {"OrderAfterVisit", Int64.Type}, {"RevenueAfterVisit", Int64.Type}, {"OrderAfterCTA", Int64.Type}, {"RevenueAfterCTA", Int64.Type}}),
+    #"선택한 열만 피벗 해제됨" = Table.Unpivot(#"변경된 유형1", {"UniqueVisitors", "Visits", "PageViews", "TimeSpentPerVisit", "OrderAfterVisit", "RevenueAfterVisit", "OrderAfterCTA", "RevenueAfterCTA"}, "특성", "값"),
+    #"이름을 바꾼 열 수1" = Table.RenameColumns(#"선택한 열만 피벗 해제됨",{{"특성", "Dimensions"}, {"값", "Metrics"}, {"Week", "WeekTemp"}}),
+    #"추가된 사용자 지정 항목" = Table.AddColumn(#"이름을 바꾼 열 수1", "WeekNumber", each let
+    OriginalDate = [WeekTemp],
+    AddedDate = Date.AddDays(OriginalDate, 6),
+    Year = if Date.Year(OriginalDate) > Date.Year(AddedDate) then Date.Year(OriginalDate) else Date.Year(AddedDate),
+    WeekNumber = Date.WeekOfYear(OriginalDate)
+in
+    Text.From(Year) & "-" & Text.From(WeekNumber)),
+    #"다시 정렬한 열 수1" = Table.ReorderColumns(#"추가된 사용자 지정 항목",{"CampaignName", "WeekNumber", "WeekTemp", "Dimensions", "Metrics"}),
+    #"제거된 열 수" = Table.RemoveColumns(#"다시 정렬한 열 수1",{"WeekTemp"})
+in
+    #"제거된 열 수"

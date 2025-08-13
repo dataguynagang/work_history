@@ -1,0 +1,23 @@
+1. 엑셀 파일에 'Path' 이름으로 시트 만들고 A1 셀에 아래 수식 입력
+
+=LEFT(CELL("filename", A1), FIND("[", CELL("filename", A1)) - 1)
+
+2. A1 셀 이름을 Path로 변경
+
+
+
+
+3. 고급편집기의 파일 로딩 부분을 아래와 같이 수정
+
+
+
+let
+
+    // 현재 파일 경로를 가져오는 부분
+    SourceFolder = Excel.CurrentWorkbook(){[Name="Path"]}[Content]{0}[Column1],
+   
+    // 상대 경로를 통해 CSV 파일 경로 설정
+    SourceFile = SourceFolder & "<파일명>.csv",
+    
+    // CSV 파일 불러오기
+    원본 = Csv.Document(File.Contents(SourceFile), [Delimiter=",", Columns=<n>, Encoding=65001, QuoteStyle=QuoteStyle.None]),

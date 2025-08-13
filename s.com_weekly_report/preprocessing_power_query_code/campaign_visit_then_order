@@ -1,0 +1,25 @@
+let
+
+
+    // 현재 파일 경로를 가져오는 부분
+    SourceFolder = Excel.CurrentWorkbook(){[Name="Path"]}[Content]{0}[Column1],
+   
+    // 상대 경로를 통해 CSV 파일 경로 설정
+    SourceFile = SourceFolder & "\adobe_raw\New_Weekly_캠페인_방문_후_구매_Ken -P4 WEB - Korea.csv",
+    
+    // CSV 파일 불러오기
+    원본 = Csv.Document(File.Contents(SourceFile), [Delimiter=",", Columns=4, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+
+
+//    원본 = Csv.Document(File.Contents("C:\Users\PTK\OneDrive - Cheil\바탕 화면\Weekly Report\new_report_ver2\adobe_raw\New_Weekly_캠페인_방문_후_구매_Ken -P4 WEB - Korea.csv"),[Delimiter=",", Columns=4, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+    #"변경된 유형" = Table.TransformColumnTypes(원본,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}}),
+    #"필터링된 행" = Table.SelectRows(#"변경된 유형", each ([Column2] <> "")),
+    #"변경된 유형1" = Table.TransformColumnTypes(#"필터링된 행",{{"Column3", Int64.Type}, {"Column4", Int64.Type}}),
+    #"이름을 바꾼 열 수" = Table.RenameColumns(#"변경된 유형1",{{"Column1", "CampaignName"}, {"Column2", "LastTouchChannel"}, {"Column3", "Order"}, {"Column4", "Revenue"}}),
+    #"구분 기호에 따라 열 분할" = Table.SplitColumn(#"이름을 바꾼 열 수", "CampaignName", Splitter.SplitTextByEachDelimiter({"방문 후"}, QuoteStyle.Csv, true), {"CampaignName.1", "CampaignName.2"}),
+    #"변경된 유형2" = Table.TransformColumnTypes(#"구분 기호에 따라 열 분할",{{"CampaignName.1", type text}, {"CampaignName.2", type text}}),
+    #"제거된 열 수" = Table.RemoveColumns(#"변경된 유형2",{"CampaignName.2"}),
+    #"잘린 텍스트" = Table.TransformColumns(#"제거된 열 수",{{"CampaignName.1", Text.Trim, type text}}),
+    #"이름을 바꾼 열 수1" = Table.RenameColumns(#"잘린 텍스트",{{"CampaignName.1", "CampaignName"}})
+in
+    #"이름을 바꾼 열 수1"

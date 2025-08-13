@@ -1,0 +1,39 @@
+let
+
+
+    // 현재 파일 경로를 가져오는 부분
+    SourceFolder = Excel.CurrentWorkbook(){[Name="Path"]}[Content]{0}[Column1],
+   
+    // 상대 경로를 통해 CSV 파일 경로 설정
+    SourceFile = SourceFolder & "\adobe_raw\New_Weekly_트래픽_Ken -P4 WEB - Korea.csv",
+    
+    // CSV 파일 불러오기
+    원본 = Csv.Document(File.Contents(SourceFile), [Delimiter=",", Columns=19, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+
+
+
+//    원본 = Csv.Document(File.Contents("C:\Users\PTK\OneDrive - Cheil\바탕 화면\Weekly Report\new_report_ver2\adobe_raw\New_Weekly_트래픽_Ken -P4 WEB - Korea.csv"),[Delimiter=",", Columns=19, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+    #"형식 변경" = Table.TransformColumnTypes(원본,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Column6", type text}, {"Column7", type text}, {"Column8", type text}, {"Column9", type text}, {"Column10", type text}, {"Column11", type text}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", type text}, {"Column16", type text}, {"Column17", type text}, {"Column18", type text}, {"Column19", type text}}),
+    #"제거된 상위 행 수" = Table.Skip(#"형식 변경",8),
+    #"조건 열이 추가됨" = Table.AddColumn(#"제거된 상위 행 수", "사용자 지정", each if Text.StartsWith([Column1], "#") then [Column1] else null),
+    #"바꾼 값" = Table.ReplaceValue(#"조건 열이 추가됨","##############################################",null,Replacer.ReplaceValue,{"사용자 지정"}),
+    #"아래로 채우기" = Table.FillDown(#"바꾼 값",{"사용자 지정"}),
+    #"필터링된 행" = Table.SelectRows(#"아래로 채우기", each ([사용자 지정] = "# 전체 Daily" or [사용자 지정] = "# 캠페인 Daily")),
+    #"바꾼 값1" = Table.ReplaceValue(#"필터링된 행","# 전체 Daily","All",Replacer.ReplaceText,{"사용자 지정"}),
+    #"바꾼 값2" = Table.ReplaceValue(#"바꾼 값1","# 캠페인 Daily","Campaign",Replacer.ReplaceText,{"사용자 지정"}),
+    #"이름을 바꾼 열 수" = Table.RenameColumns(#"바꾼 값2",{{"사용자 지정", "PageType"}}),
+    #"다시 정렬한 열 수" = Table.ReorderColumns(#"이름을 바꾼 열 수",{"Column1", "PageType", "Column2", "Column3", "Column4", "Column5", "Column6", "Column7", "Column8", "Column9", "Column10", "Column11", "Column12", "Column13", "Column14", "Column15", "Column16", "Column17", "Column18", "Column19"}),
+    #"이름을 바꾼 열 수1" = Table.RenameColumns(#"다시 정렬한 열 수",{{"Column2", "Visits - All"}, {"Column3", "Visits - Mobile"}, {"Column4", "Visits - PC"}, {"Column5", "Unique Visitors - All"}, {"Column6", "Unique Visitors - Mobile"}, {"Column7", "Unique Visitors - PC"}, {"Column8", "Page Views - All"}, {"Column9", "Page Views - Mobile"}, {"Column10", "Page Views - PC"}, {"Column11", "TimeSpentPerVisit - All"}, {"Column12", "TimeSpentPerVisit - Mobile"}, {"Column13", "TimeSpentPerVisit - PC"}, {"Column14", "Order - All"}, {"Column15", "Order - Mobile"}, {"Column16", "Order - PC"}, {"Column17", "Revenue - All"}, {"Column18", "Revenue - Mobile"}, {"Column19", "Revenue - PC"}}),
+    #"필터링된 행1" = Table.SelectRows(#"이름을 바꾼 열 수1", each ([#"Visits - All"] <> "") and ([Column1] <> "" and [Column1] <> "Day")),
+    #"피벗 해제된 열 수" = Table.UnpivotOtherColumns(#"필터링된 행1", {"Column1", "PageType"}, "특성", "값"),
+    #"중복된 열" = Table.DuplicateColumn(#"피벗 해제된 열 수", "특성", "특성 - 복사"),
+    #"다시 정렬한 열 수1" = Table.ReorderColumns(#"중복된 열",{"Column1", "PageType", "특성", "특성 - 복사", "값"}),
+    #"추출된 구분 기호 앞 텍스트" = Table.TransformColumns(#"다시 정렬한 열 수1", {{"특성", each Text.BeforeDelimiter(_, "-"), type text}}),
+    #"추출된 구분 기호 뒤 텍스트" = Table.TransformColumns(#"추출된 구분 기호 앞 텍스트", {{"특성 - 복사", each Text.AfterDelimiter(_, "-"), type text}}),
+    #"잘린 텍스트" = Table.TransformColumns(#"추출된 구분 기호 뒤 텍스트",{{"특성 - 복사", Text.Trim, type text}, {"특성", Text.Trim, type text}}),
+    #"이름을 바꾼 열 수2" = Table.RenameColumns(#"잘린 텍스트",{{"특성", "Dimensions"}, {"특성 - 복사", "Device"}, {"값", "Metrics"}}),
+    #"변경된 유형" = Table.TransformColumnTypes(#"이름을 바꾼 열 수2",{{"Column1", type datetime}}),
+    #"변경된 유형1" = Table.TransformColumnTypes(#"변경된 유형",{{"Column1", type date}, {"Metrics", Int64.Type}}),
+    #"이름을 바꾼 열 수3" = Table.RenameColumns(#"변경된 유형1",{{"Column1", "Date"}})
+in
+    #"이름을 바꾼 열 수3"

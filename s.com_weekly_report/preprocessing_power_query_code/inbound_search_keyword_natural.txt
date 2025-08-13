@@ -1,0 +1,26 @@
+let
+
+
+    // 현재 파일 경로를 가져오는 부분
+    SourceFolder = Excel.CurrentWorkbook(){[Name="Path"]}[Content]{0}[Column1],
+   
+    // 상대 경로를 통해 CSV 파일 경로 설정
+    SourceFile = SourceFolder & "\adobe_raw\New_Weekly_Scoreboard(ThisWeek)_Ken -P4 WEB - Korea.csv",
+    
+    // CSV 파일 불러오기
+    원본 = Csv.Document(File.Contents(SourceFile), [Delimiter=",", Columns=7, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+
+
+
+//    원본 = Csv.Document(File.Contents("C:\Users\PTK\OneDrive - Cheil\바탕 화면\Weekly Report\new_report_ver2\adobe_raw\New_Weekly_Scoreboard(ThisWeek)_Ken -P4 WEB - Korea.csv"),[Delimiter=",", Columns=7, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+    #"형식 변경" = Table.TransformColumnTypes(원본,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Column6", type text}, {"Column7", type text}}),
+    #"제거된 상위 행 수" = Table.Skip(#"형식 변경",8),
+    #"조건 열이 추가됨" = Table.AddColumn(#"제거된 상위 행 수", "사용자 지정", each if Text.StartsWith([Column1], "#") then [Column1] else null),
+    #"바꾼 값" = Table.ReplaceValue(#"조건 열이 추가됨","##############################################",null,Replacer.ReplaceValue,{"사용자 지정"}),
+    #"아래로 채우기" = Table.FillDown(#"바꾼 값",{"사용자 지정"}),
+    #"필터링된 행" = Table.SelectRows(#"아래로 채우기", each ([사용자 지정] = "# Inbound Search Keyword(Natural)") and ([Column2] <> "" and [Column2] <> "Searches")),
+    #"제거된 열 수" = Table.RemoveColumns(#"필터링된 행",{"Column3", "Column4", "Column5", "Column6", "Column7", "사용자 지정"}),
+    #"이름을 바꾼 열 수" = Table.RenameColumns(#"제거된 열 수",{{"Column1", "Search Keyword"}, {"Column2", "Searches"}}),
+    #"변경된 유형" = Table.TransformColumnTypes(#"이름을 바꾼 열 수",{{"Searches", Int64.Type}})
+in
+    #"변경된 유형"

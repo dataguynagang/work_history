@@ -1,0 +1,36 @@
+let
+
+
+
+    // 현재 파일 경로를 가져오는 부분
+    SourceFolder = Excel.CurrentWorkbook(){[Name="Path"]}[Content]{0}[Column1],
+   
+    // 상대 경로를 통해 CSV 파일 경로 설정
+    SourceFile = SourceFolder & "\adobe_raw\New_Weekly_Scoreboard(Weekly)_Ken -P4 WEB - Korea.csv",
+    
+    // CSV 파일 불러오기
+    원본 = Csv.Document(File.Contents(SourceFile), [Delimiter=",", Columns=3, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+
+
+
+//    원본 = Csv.Document(File.Contents("C:\Users\PTK\OneDrive - Cheil\바탕 화면\Weekly Report\new_report_ver2\adobe_raw\New_Weekly_Scoreboard(Weekly)_Ken -P4 WEB - Korea.csv"),[Delimiter=",", Columns=3, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+    #"형식 변경" = Table.TransformColumnTypes(원본,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}}),
+    #"조건 열이 추가됨" = Table.AddColumn(#"형식 변경", "사용자 지정", each if Text.StartsWith([Column1], "#") then [Column1] else null),
+    #"제거된 상위 행 수" = Table.Skip(#"조건 열이 추가됨",8),
+    #"바꾼 값" = Table.ReplaceValue(#"제거된 상위 행 수","##############################################",null,Replacer.ReplaceValue,{"사용자 지정"}),
+    #"아래로 채우기" = Table.FillDown(#"바꾼 값",{"사용자 지정"}),
+    #"필터링된 행1" = Table.SelectRows(#"아래로 채우기", each ([사용자 지정] = "# weekly_visits_by_model_category")),
+    #"필터링된 행" = Table.SelectRows(#"필터링된 행1", each ([사용자 지정] = "# weekly_visits_by_model_category") and ([Column3] <> "" and [Column3] <> "Visits") and ([Column2] <> "" and [Column2] <> "Week")),
+    #"변경된 유형" = Table.TransformColumnTypes(#"필터링된 행",{{"Column2", type datetime}}),
+    #"추가된 사용자 지정 항목" = Table.AddColumn(#"변경된 유형", "WeekNumber", each let
+    OriginalDate = [Column2],
+    AddedDate = Date.AddDays(OriginalDate, 6),
+    Year = if Date.Year(OriginalDate) > Date.Year(AddedDate) then Date.Year(OriginalDate) else Date.Year(AddedDate),
+    WeekNumber = Date.WeekOfYear(OriginalDate)
+in
+    Text.From(Year) & "-" & Text.From(WeekNumber)),
+    #"다시 정렬한 열 수" = Table.ReorderColumns(#"추가된 사용자 지정 항목",{"WeekNumber", "Column1", "Column2", "Column3", "사용자 지정"}),
+    #"제거된 열 수" = Table.RemoveColumns(#"다시 정렬한 열 수",{"Column2", "사용자 지정"}),
+    #"이름을 바꾼 열 수" = Table.RenameColumns(#"제거된 열 수",{{"Column1", "Model Category_2depth"}, {"Column3", "Visits"}})
+in
+    #"이름을 바꾼 열 수"

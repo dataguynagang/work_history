@@ -1,0 +1,39 @@
+let
+
+
+    // 현재 파일 경로를 가져오는 부분
+    SourceFolder = Excel.CurrentWorkbook(){[Name="Path"]}[Content]{0}[Column1],
+   
+    // 상대 경로를 통해 CSV 파일 경로 설정
+    SourceFile = SourceFolder & "\adobe_raw\New_Weekly_Scoreboard(ThisWeek)_Ken -P4 WEB - Korea.csv",
+    
+    // CSV 파일 불러오기
+    원본 = Csv.Document(File.Contents(SourceFile), [Delimiter=",", Columns=7, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+
+
+
+//    원본 = Csv.Document(File.Contents("C:\Users\PTK\OneDrive - Cheil\바탕 화면\Weekly Report\new_report_ver2\adobe_raw\New_Weekly_Scoreboard(ThisWeek)_Ken -P4 WEB - Korea.csv"),[Delimiter=",", Columns=7, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+    #"형식 변경" = Table.TransformColumnTypes(원본,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Column6", type text}, {"Column7", type text}}),
+    #"제거된 상위 행 수" = Table.Skip(#"형식 변경",8),
+    #"조건 열이 추가됨" = Table.AddColumn(#"제거된 상위 행 수", "사용자 지정", each if Text.StartsWith([Column1], "#") then [Column1] else null),
+    #"바꾼 값" = Table.ReplaceValue(#"조건 열이 추가됨","##############################################",null,Replacer.ReplaceValue,{"사용자 지정"}),
+    #"아래로 채우기" = Table.FillDown(#"바꾼 값",{"사용자 지정"}),
+    #"필터링된 행" = Table.SelectRows(#"아래로 채우기", each ([사용자 지정] = "# Hourly traffic")),
+    #"이름을 바꾼 열 수" = Table.RenameColumns(#"필터링된 행",{{"Column2", "All-All"}, {"Column3", "All-Mobile"}, {"Column4", "All-PC"}, {"Column5", "Campaign-All"}, {"Column6", "Campaign-Mobile"}, {"Column7", "Campaign-PC"}}),
+    #"필터링된 행1" = Table.SelectRows(#"이름을 바꾼 열 수", each ([Column1] <> "" and [Column1] <> "# Hourly traffic" and [Column1] <> "##############################################" and [Column1] <> "Hour of Day")),
+    #"제거된 열 수" = Table.RemoveColumns(#"필터링된 행1",{"사용자 지정"}),
+    #"변경된 유형" = Table.TransformColumnTypes(#"제거된 열 수",{{"Column1", type number}}),
+    #"추가된 사용자 지정 항목" = Table.AddColumn(#"변경된 유형", "Hour", each [Column1]),
+    #"다시 정렬한 열 수" = Table.ReorderColumns(#"추가된 사용자 지정 항목",{"Hour", "Column1", "All-All", "All-Mobile", "All-PC", "Campaign-All", "Campaign-Mobile", "Campaign-PC"}),
+    #"제거된 열 수1" = Table.RemoveColumns(#"다시 정렬한 열 수",{"Column1"}),
+    #"피벗 해제된 열 수" = Table.UnpivotOtherColumns(#"제거된 열 수1", {"Hour"}, "특성", "값"),
+    #"중복된 열" = Table.DuplicateColumn(#"피벗 해제된 열 수", "특성", "특성 - 복사"),
+    #"다시 정렬한 열 수1" = Table.ReorderColumns(#"중복된 열",{"Hour", "특성", "특성 - 복사", "값"}),
+    #"추출된 구분 기호 앞 텍스트" = Table.TransformColumns(#"다시 정렬한 열 수1", {{"특성", each Text.BeforeDelimiter(_, "-"), type text}}),
+    #"추출된 구분 기호 뒤 텍스트" = Table.TransformColumns(#"추출된 구분 기호 앞 텍스트", {{"특성 - 복사", each Text.AfterDelimiter(_, "-"), type text}}),
+    #"변경된 유형1" = Table.TransformColumnTypes(#"추출된 구분 기호 뒤 텍스트",{{"값", Int64.Type}}),
+    #"이름을 바꾼 열 수1" = Table.RenameColumns(#"변경된 유형1",{{"특성", "PageType"}, {"특성 - 복사", "DeviceType"}, {"값", "Visits"}}),
+    #"잘린 텍스트" = Table.TransformColumns(#"이름을 바꾼 열 수1",{{"PageType", Text.Trim, type text}, {"DeviceType", Text.Trim, type text}}),
+    #"변경된 유형2" = Table.TransformColumnTypes(#"잘린 텍스트",{{"Hour", type time}})
+in
+    #"변경된 유형2"
